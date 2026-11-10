@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>Retirement Monte Carlo Planner</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #6e6c66;
+    --link: #256abf;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;   /* blue */
+    --series-2: #eb6834;   /* orange */
+    --band-outer: #cde2fb;
+    --band-inner: #9ec5f4;
+    --good: #0ca30c;
+    --good-text: #006300;
+    --critical: #d03b3b;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --link: #3987e5;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --band-outer: #1c3a5e;
+    --band-inner: #2a5a94;
+    --good: #0ca30c;
+    --good-text: #0ca30c;
+    --critical: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  h1 { font-size: 26px; margin: 0 0 2px; }
+  .tagline { color: var(--text-secondary); margin: 0 0 18px; font-size: 14px; }
+  .privacy { font-size: 12.5px; color: var(--muted); }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; margin: 14px 0;
+  }
+  h2 { font-size: 17px; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 18px; }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  input, select {
+    width: 100%; padding: 8px 10px; font-size: 16px; /* >=16px stops iOS zoom-on-focus */
+    border: 1px solid var(--baseline); border-radius: 6px;
+    background: var(--surface-1); color: var(--text-primary);
+  }
+  .scrollx { overflow-x: auto; }
+  .scrollx table { min-width: 420px; }
+  .scrollx table#incTable { min-width: 560px; }
+  input:focus, select:focus { outline: 2px solid var(--series-1); outline-offset: 0; border-color: transparent; }
+  .help { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .help a { color: var(--link); }
+  details { margin: 14px 0; }
+  details > summary {
+    cursor: pointer; font-size: 15px; font-weight: 600; padding: 12px 16px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    list-style-position: inside;
+  }
+  details[open] > summary { border-radius: 10px 10px 0 0; }
+  details > .card { margin-top: 0; border-top: none; border-radius: 0 0 10px 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--gridline); }
+  th { color: var(--text-secondary); font-weight: 600; font-size: 12.5px; }
+  td input { padding: 6px 8px; font-size: 14px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  button {
+    font-size: 14px; padding: 8px 14px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--baseline); background: var(--surface-1); color: var(--text-primary);
+  }
+  button.primary {
+    background: var(--series-1); color: #fff; border-color: transparent;
+    font-size: 16px; padding: 12px 26px; font-weight: 600;
+  }
+  button.small { font-size: 12.5px; padding: 4px 10px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .run-row { text-align: center; margin: 22px 0 6px; }
+  #status { color: var(--muted); font-size: 13px; margin-left: 12px; }
+  #errors {
+    display: none; border: 1px solid var(--critical); border-radius: 10px;
+    background: color-mix(in srgb, var(--critical) 8%, var(--surface-1));
+    padding: 12px 18px; margin: 14px 0; font-size: 14px;
+  }
+  #errors ul { margin: 6px 0 0; padding-left: 20px; }
+  #staleNote {
+    display: none; border: 1px solid var(--series-2); border-radius: 10px;
+    background: color-mix(in srgb, var(--series-2) 9%, var(--surface-1));
+    padding: 10px 18px; margin: 14px 0 0; font-size: 14px;
+  }
+  #results.stale { opacity: 0.45; }
+  .verdict { font-size: 17px; padding: 16px 20px; border-radius: 10px; margin: 14px 0; border: 1px solid var(--border); }
+  .verdict.pass { background: color-mix(in srgb, var(--good) 10%, var(--surface-1)); }
+  .verdict.fail { background: color-mix(in srgb, var(--critical) 10%, var(--surface-1)); }
+  .verdict .pct { font-size: 30px; font-weight: 700; }
+  .statrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
+  .stat { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+  .stat .v { font-size: 22px; font-weight: 700; }
+  .stat .l { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+  #chartbox { position: relative; }
+  #fanchart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+  #tooltip {
+    position: absolute; pointer-events: none; display: none;
+    background: var(--surface-1); border: 1px solid var(--baseline); border-radius: 7px;
+    padding: 8px 11px; font-size: 12.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    font-variant-numeric: tabular-nums; z-index: 5; min-width: 150px;
+  }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); margin: 8px 2px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+  .sw.line { height: 3px; border-radius: 2px; }
+  .sens td.cell { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sens td.hit { font-weight: 700; color: var(--good-text); }
+  .sens td.miss { color: var(--critical); }
+  #dataTable td, #dataTable th { text-align: right; }
+  #dataTable th:first-child, #dataTable td:first-child { text-align: left; }
+  #echo { font-size: 13px; color: var(--text-secondary); white-space: pre-wrap; font-variant-numeric: tabular-nums; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 28px; }
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 10px 48px; }
+    h1 { font-size: 21px; }
+    .card { padding: 14px 12px; }
+    th, td { padding: 6px 5px; }
+    td input { font-size: 16px; padding: 6px 6px; }
+    button.primary { width: 100%; }
+    #status { display: block; margin: 8px 0 0; }
+    .verdict { font-size: 15px; } .verdict .pct { font-size: 25px; }
+    .stat .v { font-size: 19px; }
+  }
+  @media print {
+    button, .toolbar, .run-row, #staleNote { display: none !important; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Retirement Monte Carlo Planner</h1>
+      <p class="tagline">All amounts are in today's dollars — results already account for inflation. US investors.</p>
+    </div>
+    <div class="toolbar">
+      <button id="saveBtn" class="small">Save plan (.json)</button>
+      <button id="loadBtn" class="small">Load plan</button>
+      <input type="file" id="loadFile" accept=".json" style="display:none">
+      <button id="printBtn" class="small">Print / PDF</button>
+      <button id="themeBtn" class="small">Dark mode</button>
+      <button id="resetBtn" class="small">Reset all data</button>
+    </div>
+  </header>
+  <p class="privacy">Everything runs in your browser — nothing you type is sent anywhere.
+    Entries are saved only on this device; use “Reset all data” to erase them.</p>
+
+  <div class="card">
+    <h2>About you</h2>
+    <div class="grid">
+      <div><label for="age">Current age</label><input type="number" id="age" min="18" max="80" value="55"></div>
+      <div><label for="retireAge">Retirement age</label><input type="number" id="retireAge" min="50" max="80" value="65"></div>
+      <div><label for="planAge">Plan through age</label><input type="number" id="planAge" min="75" max="105" value="95">
+        <div class="help">How long the money must last. 95 is a prudent default — about 1 in 5 65-year-olds lives past 90.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Savings &amp; spending</h2>
+    <div class="grid">
+      <div><label for="saving">Savings per year until retirement ($)</label><input type="number" id="saving" min="0" step="1000" value="25000">
+        <div class="help">Everything going into investments: 401k + employer match + IRA + brokerage.</div></div>
+      <div><label for="spend">Spending per year in retirement ($)</label><input type="number" id="spend" min="0" step="1000" value="80000">
+        <div class="help">Today's dollars, all-in (the tool grosses up for taxes separately).</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Investment accounts</h2>
+    <div class="scrollx"><table id="acctTable">
+      <thead><tr><th>Account</th><th class="num">Balance ($)</th><th></th></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><th>Total</th><th class="num" id="acctTotal">$0</th><th></th></tr></tfoot>
+    </table></div>
+    <div style="margin-top:8px"><button id="addAcct" class="small">Add account</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Social Security</h2>
+    <div class="grid">
+      <div><label for="ssAge">Age you'll start collecting</label><input type="number" id="ssAge" min="62" max="70" value="67"></div>
+      <div><label for="ssMonthly">Estimated monthly benefit at that age ($, today's dollars)</label><input type="number" id="ssMonthly" min="0" step="50" value="3000"></div>
+    </div>
+    <div class="help" style="margin-top:8px">
+      Get your number from your official statement at <a href="https://www.ssa.gov/myaccount/" target="_blank" rel="noopener">ssa.gov/myaccount</a>
+      (Retirement Benefit Estimates table — pick the row for your claiming age).
+      If you'll stop working before you claim, the statement overstates your benefit;
+      <a href="https://ssa.tools/" target="_blank" rel="noopener">ssa.tools</a> can recompute it with your earnings ending at retirement.
+      A safety haircut (default 20%, in Economic Assumptions) is applied for trust-fund uncertainty.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Other income in retirement <span style="font-weight:400;color:var(--muted);font-size:13px">(pension, rental, annuity — optional)</span></h2>
+    <div class="scrollx"><table id="incTable">
+      <thead><tr><th>Name</th><th class="num">Amount per year ($)</th><th class="num">Starts at age</th><th class="num">Ends at age</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div style="margin-top:8px"><button id="addInc" class="small">Add income stream</button></div>
+  </div>
+
+  <details id="assumptions">
+    <summary>Economic Assumptions — sensible defaults, change only if you know why</summary>
+    <div class="card">
+      <div class="grid">
+        <div><label for="eqRet">Stock return, %/yr above inflation</label><input type="number" id="eqRet" step="0.1" value="5.0">
+          <div class="help">Deliberately below the ~7% historical average.</div></div>
+        <div><label for="bdRet">Bond return, %/yr above inflation</label><input type="number" id="bdRet" step="0.1" value="1.5"></div>
+        <div><label for="eqVol">Stock volatility %</label><input type="number" id="eqVol" step="0.5" value="16"></div>
+        <div><label for="bdVol">Bond volatility %</label><input type="number" id="bdVol" step="0.5" value="6"></div>
+        <div><label for="eqNow">Stocks % of portfolio today</label><input type="number" id="eqNow" min="0" max="100" value="80"></div>
+        <div><label for="eqRetire">Stocks % from retirement on</label><input type="number" id="eqRetire" min="0" max="100" value="60">
+          <div class="help">Shifts gradually from today's mix to this by retirement day.</div></div>
+        <div><label for="taxRate">Effective tax rate on withdrawals %</label><input type="number" id="taxRate" min="0" max="50" step="0.5" value="12">
+          <div class="help">Blended rate across pre-tax, Roth and taxable money.</div></div>
+        <div><label for="ssHaircut">Social Security haircut %</label><input type="number" id="ssHaircut" min="0" max="50" step="1" value="20"></div>
+        <div><label for="bar">Confidence level required</label>
+          <select id="bar"><option>75</option><option>80</option><option selected>85</option><option>90</option></select>
+          <div class="help">Plan passes if at least this share of simulations never runs out.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <div id="errors" role="alert"></div>
+
+  <div class="run-row">
+    <button id="runBtn" class="primary">Run 10,000 simulations</button><span id="status"></span>
+  </div>
+
+  <div id="staleNote">Inputs have changed since this result was computed — run the simulation again.</div>
+
+  <div id="results" style="display:none">
+    <div id="verdict" class="verdict"></div>
+
+    <div class="card">
+      <h2>Portfolio balance by age — 10,000 possible futures</h2>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--band-outer)"></span>10th–90th percentile</span>
+        <span><span class="sw" style="background:var(--band-inner)"></span>25th–75th percentile</span>
+        <span><span class="sw line" style="background:var(--series-1)"></span>Median</span>
+        <span><span class="sw line" style="background:var(--series-2)"></span>The confidence bar (worst-case planning path)</span>
+      </div>
+      <div id="chartbox">
+        <canvas id="fanchart" role="img" aria-label="Fan chart of simulated portfolio balance by age. The same numbers are in the data table below."></canvas>
+        <div id="tooltip"></div>
+      </div>
+      <div style="margin-top:8px"><button id="pngBtn" class="small">Download chart (PNG)</button></div>
+      <details style="margin-bottom:0">
+        <summary style="font-size:13.5px;font-weight:500">View chart data as a table</summary>
+        <div class="card" style="overflow-x:auto"><table id="dataTable"></table></div>
+      </details>
+    </div>
+
+    <div class="statrow" id="stats"></div>
+
+    <div class="card">
+      <h2>How sensitive is this? (success % by retirement age and spending)</h2>
+      <div style="overflow-x:auto"><table class="sens" id="sensTable"></table></div>
+      <div class="help" style="margin-top:6px">✓ marks cells that meet your confidence level. Each row is a retirement age; each column a spending level.</div>
+    </div>
+
+    <div class="card">
+      <h2>If it fails, when?</h2>
+      <p id="failure" style="margin:0;font-size:14.5px"></p>
+    </div>
+
+    <div class="card">
+      <h2>Assumptions used (show this to your advisor)</h2>
+      <div id="echo"></div>
+    </div>
+  </div>
+
+  <footer>
+    This is an educational model, not financial advice. Returns are drawn as independent normal years
+    (no fat tails or momentum). Taxes use one blended rate — real tax sequencing (RMDs, brackets, IRMAA) differs.
+    Verify Social Security numbers at ssa.gov.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const fmt$ = v => "$" + Math.round(v).toLocaleString("en-US");
+const fmtM = v => v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : "$" + Math.round(v / 1000) + "k";
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+const SEED = 20261101;
+const MAX_ROWS = 20;
+
+/* field id -> [label, min, max] — one source of truth for UI + JSON validation */
+const FIELDS = {
+  age: ["Current age", 18, 80],
+  retireAge: ["Retirement age", 50, 80],
+  planAge: ["Plan through age", 75, 105],
+  saving: ["Savings per year", 0, 2e6],
+  spend: ["Spending per year", 0, 2e6],
+  ssAge: ["Social Security start age", 62, 70],
+  ssMonthly: ["Social Security monthly benefit", 0, 25000],
+  eqRet: ["Stock return", -5, 12],
+  bdRet: ["Bond return", -5, 10],
+  eqVol: ["Stock volatility", 0, 60],
+  bdVol: ["Bond volatility", 0, 40],
+  eqNow: ["Stocks % today", 0, 100],
+  eqRetire: ["Stocks % at retirement", 0, 100],
+  taxRate: ["Tax rate", 0, 50],
+  ssHaircut: ["Social Security haircut", 0, 50],
+};
+
+/* Seeded RNG (mulberry32) + Box-Muller standard normals. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormals(n, seed) {
+  const rand = mulberry32(seed);
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i += 2) {
+    const u1 = Math.max(rand(), 1e-12), u2 = rand();
+    const r = Math.sqrt(-2 * Math.log(u1)), th = 2 * Math.PI * u2;
+    out[i] = r * Math.cos(th);
+    if (i + 1 < n) out[i + 1] = r * Math.sin(th);
+  }
+  return out;
+}
+
+/* ---------- dynamic tables (DOM-built: user strings never touch innerHTML) ---------- */
+function textCell(value, placeholder) {
+  const td = document.createElement("td"), i = document.createElement("input");
+  i.type = "text"; i.maxLength = 40; i.placeholder = placeholder || "";
+  i.value = value == null ? "" : String(value).slice(0, 40);
+  td.appendChild(i); return td;
+}
+function numCell(value, min, max, step) {
+  const td = document.createElement("td"), i = document.createElement("input");
+  i.type = "number"; i.className = "num"; i.min = min; i.max = max; i.step = step || 1;
+  if (value !== "" && value != null && Number.isFinite(+value)) i.value = +value;
+  td.appendChild(i); return td;
+}
+function delCell(tr, after) {
+  const td = document.createElement("td"), b = document.createElement("button");
+  b.className = "small del"; b.type = "button"; b.textContent = "✕";
+  b.onclick = () => { tr.remove(); if (after) after(); markStale(); };
+  td.appendChild(b); return td;
+}
+function addAcctRow(name = "", bal = "") {
+  if ($("acctTable").tBodies[0].rows.length >= MAX_ROWS) return;
+  const tr = document.createElement("tr");
+  tr.appendChild(textCell(name, "e.g. 401k"));
+  tr.appendChild(numCell(bal, 0, 5e8, 1000));
+  tr.appendChild(delCell(tr, sumAccts));
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("input", sumAccts));
+  $("acctTable").tBodies[0].appendChild(tr);
+}
+function sumAccts() {
+  let t = 0;
+  for (const tr of $("acctTable").tBodies[0].rows) t += clamp(+tr.cells[1].firstChild.value || 0, 0, 5e8);
+  $("acctTotal").textContent = fmt$(t);
+  return t;
+}
+function addIncRow(name = "", amt = "", start = "", end = "") {
+  if ($("incTable").tBodies[0].rows.length >= MAX_ROWS) return;
+  const tr = document.createElement("tr");
+  tr.appendChild(textCell(name, "e.g. pension"));
+  tr.appendChild(numCell(amt, 0, 2e6, 500));
+  tr.appendChild(numCell(start, 50, 105, 1));
+  const endCell = numCell(end, 50, 106, 1);
+  endCell.firstChild.placeholder = "for life";
+  tr.appendChild(endCell);
+  tr.appendChild(delCell(tr));
+  $("incTable").tBodies[0].appendChild(tr);
+}
+$("addAcct").onclick = () => { addAcctRow(); markStale(); };
+$("addInc").onclick = () => { addIncRow(); markStale(); };
+
+/* ---------- read & validate inputs ---------- */
+function validateInputs() {
+  const errs = [];
+  for (const [id, [label, min, max]] of Object.entries(FIELDS)) {
+    const v = parseFloat($(id).value);
+    if (!Number.isFinite(v)) errs.push(`${label} is blank or not a number.`);
+    else if (v < min || v > max) errs.push(`${label} must be between ${min} and ${max}.`);
+  }
+  return errs;
+}
+function readPlan() {
+  const f = id => {
+    const [, min, max] = FIELDS[id] ? [0, FIELDS[id][1], FIELDS[id][2]] : [0, -1e9, 1e9];
+    return clamp(parseFloat($(id).value) || 0, min, max);
+  };
+  const incomes = [];
+  for (const tr of $("incTable").tBodies[0].rows) {
+    const amt = clamp(+tr.cells[1].firstChild.value || 0, 0, 2e6);
+    if (amt > 0) incomes.push({
+      name: String(tr.cells[0].firstChild.value || "income").slice(0, 40),
+      amount: amt,
+      start: clamp(+tr.cells[2].firstChild.value || 65, 50, 105),
+      end: tr.cells[3].firstChild.value === "" ? 200 : clamp(+tr.cells[3].firstChild.value, 50, 106),
+    });
+  }
+  const accounts = [];
+  for (const tr of $("acctTable").tBodies[0].rows) accounts.push({
+    name: String(tr.cells[0].firstChild.value).slice(0, 40),
+    balance: clamp(+tr.cells[1].firstChild.value || 0, 0, 5e8),
+  });
+  return {
+    age: f("age"), retireAge: f("retireAge"), planAge: f("planAge"),
+    saving: f("saving"), spend: f("spend"),
+    accounts, startBalance: sumAccts(),
+    ssAge: f("ssAge"), ssAnnual: 12 * f("ssMonthly"),
+    incomes,
+    eqRet: f("eqRet") / 100, bdRet: f("bdRet") / 100,
+    eqVol: f("eqVol") / 100, bdVol: f("bdVol") / 100,
+    eqNow: f("eqNow") / 100, eqRetire: f("eqRetire") / 100,
+    taxRate: f("taxRate") / 100, ssHaircut: f("ssHaircut") / 100,
+    bar: clamp(+$("bar").value || 85, 50, 99) / 100,
+  };
+}
+
+/* ---------- the model (mirrors model/projection.py) ---------- */
+function equityFrac(p, age) {
+  if (age >= p.retireAge) return p.eqRetire;
+  const f = (age - p.age) / (p.retireAge - p.age);
+  return p.eqNow + f * (p.eqRetire - p.eqNow);
+}
+/* Build the per-year portfolio return matrix once; reuse for every solve. */
+function buildReturns(p, nPaths, seed) {
+  const years = p.planAge - p.age;
+  const eqZ = makeNormals(nPaths * years, seed), bdZ = makeNormals(nPaths * years, seed + 7919);
+  const rets = new Float64Array(nPaths * years);
+  for (let y = 0; y < years; y++) {
+    const ef = equityFrac(p, p.age + y);
+    for (let i = 0; i < nPaths; i++) {
+      const k = i * years + y;
+      rets[k] = ef * (p.eqRet + p.eqVol * eqZ[k]) + (1 - ef) * (p.bdRet + p.bdVol * bdZ[k]);
+    }
+  }
+  return { rets, years, nPaths };
+}
+/* spending offsets in net terms (SS + income streams) */
+function netOffsets(p, age) {
+  let off = 0;
+  if (age >= p.ssAge) off += p.ssAnnual * (1 - p.ssHaircut);
+  for (const s of p.incomes) if (age >= s.start && age <= s.end) off += s.amount;
+  return off;
+}
+/* One full simulation. Returns success rate; optionally records percentiles,
+   retirement-day balances, and depletion ages. */
+function simulate(p, R, opts = {}) {
+  const { rets, years, nPaths } = R;
+  const retireAge = opts.retireAge ?? p.retireAge;
+  const saving = opts.saving ?? p.saving;
+  const spendMult = opts.spendMult ?? 1;
+  const bal = new Float64Array(nPaths).fill(opts.startBalance ?? p.startBalance);
+  const alive = new Uint8Array(nPaths).fill(1);
+  const recB = opts.record ? [] : null;
+  const retDay = opts.record ? new Float64Array(nPaths) : null;
+  const depAge = opts.record ? new Int16Array(nPaths).fill(-1) : null;
+  if (recB) recB.push(Float64Array.from(bal));
+  for (let y = 0; y < years; y++) {
+    const age = p.age + y;
+    const gw = Math.max(p.spend * spendMult - netOffsets(p, age), 0) / (1 - p.taxRate);
+    for (let i = 0; i < nPaths; i++) {
+      if (!alive[i]) continue;
+      if (age < retireAge) bal[i] += saving;
+      else {
+        if (retDay && age === retireAge) retDay[i] = bal[i];
+        bal[i] -= gw;
+        if (bal[i] <= 0) { alive[i] = 0; bal[i] = 0; if (depAge) depAge[i] = age; continue; }
+      }
+      bal[i] *= 1 + rets[i * years + y];
+      if (bal[i] <= 0) { alive[i] = 0; bal[i] = 0; if (depAge) depAge[i] = age; }
+    }
+    if (recB) recB.push(Float64Array.from(bal));
+  }
+  let ok = 0; for (let i = 0; i < nPaths; i++) ok += alive[i];
+  return { success: ok / nPaths, recB, retDay, depAge };
+}
+function percentile(sorted, q) {
+  const idx = q * (sorted.length - 1), lo = Math.floor(idx), hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+/* Bisection solvers on cached return matrices. */
+function solveRequiredSavings(p, R) {
+  if (simulate(p, R, { saving: 0 }).success >= p.bar) return 0;
+  let lo = 0, hi = 500000;
+  if (simulate(p, R, { saving: hi }).success < p.bar) return null;
+  for (let k = 0; k < 18; k++) {
+    const mid = (lo + hi) / 2;
+    if (simulate(p, R, { saving: mid }).success >= p.bar) hi = mid; else lo = mid;
+  }
+  return hi;
+}
+function solveRequiredAssets(p) {
+  let lo = 0, hi = p.startBalance * 2 + p.spend * 60 + 1e5;
+  const q = { ...p, age: p.retireAge, startBalance: 0 };
+  const R2 = buildReturns(q, 4000, 777);
+  const test = b => simulate(q, R2, { saving: 0, startBalance: b }).success >= p.bar;
+  if (!test(hi)) return null;
+  for (let k = 0; k < 16; k++) {
+    const mid = (lo + hi) / 2;
+    if (test(mid)) hi = mid; else lo = mid;
+  }
+  return hi;
+}
+/* Max sustainable spending: doubles the bound until it fails (reports a floor
+   if even 256x passes), then bisects. Returns {value, capped} or null. */
+function solveMaxSpend(p, R) {
+  if (p.spend <= 0) return null;
+  const pass = m => simulate(p, R, { spendMult: m }).success >= p.bar;
+  let lo = 0, hi = 1;
+  if (pass(1)) {
+    while (hi < 256 && pass(hi * 2)) hi *= 2;
+    if (hi >= 256) return { value: hi * 2 * p.spend, capped: true };
+    lo = hi; hi = hi * 2;
+  }
+  for (let k = 0; k < 16; k++) {
+    const mid = (lo + hi) / 2;
+    if (pass(mid)) lo = mid; else hi = mid;
+  }
+  return { value: lo * p.spend, capped: false };
+}
+
+/* ---------- chart ---------- */
+let chartData = null;
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function niceStep(range) {
+  const target = range / 5;
+  for (const s of [1e5, 2.5e5, 5e5, 1e6, 2e6, 2.5e6, 5e6, 1e7, 2.5e7, 5e7, 1e8, 2.5e8])
+    if (s >= target) return s;
+  return 5e8;
+}
+function drawChart() {
+  if (!chartData) return;
+  const { ages, bands, retireAge, ssAge, yCap } = chartData;
+  const cv = $("fanchart"), ctx = cv.getContext("2d");
+  const cssW = Math.max(cv.parentElement.clientWidth || 920, 300);
+  const narrow = cssW < 620;
+  cv.width = cssW * 2;
+  cv.height = Math.round(cv.width * (narrow ? 0.85 : 0.55));
+  const W = cv.width, H = cv.height;
+  const F = Math.max(22, Math.round(W * 0.0135));   /* base font, px */
+  const L = Math.round(F * 4.4), Rm = Math.round(F * 1.2),
+        T = Math.round(F * 1.9), B = Math.round(F * 3.1);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = cssVar("--surface-1"); ctx.fillRect(0, 0, W, H);
+  const x = a => L + (a - ages[0]) / (ages[ages.length - 1] - ages[0]) * (W - L - Rm);
+  const y = v => T + (1 - Math.min(v, yCap) / yCap) * (H - T - B);
+  /* grid */
+  ctx.strokeStyle = cssVar("--gridline"); ctx.lineWidth = Math.max(1, F / 16);
+  ctx.fillStyle = cssVar("--muted"); ctx.font = `${F}px system-ui`; ctx.textAlign = "right";
+  const step = niceStep(yCap);
+  for (let v = 0; v <= yCap + 1; v += step) {
+    ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(W - Rm, y(v)); ctx.stroke();
+    ctx.fillText(fmtM(v), L - F * 0.4, y(v) + F * 0.35);
+  }
+  ctx.textAlign = "center";
+  const tickEvery = narrow ? 10 : 5;
+  for (let a = Math.ceil(ages[0] / tickEvery) * tickEvery; a <= ages[ages.length - 1]; a += tickEvery)
+    ctx.fillText(a, x(a), H - B + F * 1.4);
+  ctx.fillText("Age", (L + W - Rm) / 2, H - F * 0.4);
+  /* milestone rules */
+  ctx.strokeStyle = cssVar("--baseline");
+  for (const [a, label] of [[retireAge, "retire"], [ssAge, "Soc. Sec."]]) {
+    ctx.beginPath(); ctx.moveTo(x(a), T); ctx.lineTo(x(a), H - B); ctx.stroke();
+    ctx.textAlign = "left"; ctx.fillText(label, x(a) + F * 0.3, T + F * 1.1);
+  }
+  const band = (loArr, hiArr, color) => {
+    ctx.beginPath(); ctx.fillStyle = color;
+    ages.forEach((a, i) => i ? ctx.lineTo(x(a), y(hiArr[i])) : ctx.moveTo(x(a), y(hiArr[i])));
+    for (let i = ages.length - 1; i >= 0; i--) ctx.lineTo(x(ages[i]), y(loArr[i]));
+    ctx.closePath(); ctx.fill();
+  };
+  band(bands.p10, bands.p90, cssVar("--band-outer"));
+  band(bands.p25, bands.p75, cssVar("--band-inner"));
+  const line = (arr, color, dash) => {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = F / 6;
+    ctx.setLineDash(dash ? dash.map(d => d * F / 24) : []);
+    ages.forEach((a, i) => i ? ctx.lineTo(x(a), y(arr[i])) : ctx.moveTo(x(a), y(arr[i])));
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(bands.p50, cssVar("--series-1"));
+  line(bands.pBar, cssVar("--series-2"), [10, 8]);
+  /* crop note if the top band clipped */
+  if (bands.p90[bands.p90.length - 1] > yCap) {
+    ctx.fillStyle = cssVar("--text-secondary"); ctx.textAlign = "right";
+    ctx.font = `${Math.round(F * 0.85)}px system-ui`;
+    ctx.fillText(`axis cropped at ${fmtM(yCap)}; top of range reaches ${fmtM(bands.p90[bands.p90.length - 1])}`,
+      W - Rm - F * 0.3, T + F);
+  }
+  chartData.xy = { x, y, L, Rm, T, B, W, H };
+}
+function attachHover() {
+  const cv = $("fanchart"), tip = $("tooltip");
+  const show = e => {
+    if (!chartData?.xy) return;
+    const r = cv.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * cv.width / r.width;
+    const { ages, bands } = chartData, { L, Rm, W } = chartData.xy;
+    const frac = (mx - L) / (W - L - Rm);
+    if (frac < 0 || frac > 1) { tip.style.display = "none"; return; }
+    const i = Math.round(frac * (ages.length - 1));
+    tip.style.display = "block";
+    tip.style.left = Math.min(Math.max(e.clientX - r.left + 14, 0), r.width - 170) + "px";
+    tip.style.top = (e.clientY - r.top + 14) + "px";
+    tip.innerHTML = `<b>Age ${ages[i]}</b><br>
+      90th pct: ${fmtM(bands.p90[i])}<br>75th pct: ${fmtM(bands.p75[i])}<br>
+      <b>Median: ${fmtM(bands.p50[i])}</b><br>25th pct: ${fmtM(bands.p25[i])}<br>
+      10th pct: ${fmtM(bands.p10[i])}<br>
+      <span style="color:var(--series-2)">Bar path: ${fmtM(bands.pBar[i])}</span>`;
+  };
+  cv.onpointermove = show;
+  cv.onpointerdown = show;
+  cv.onpointerleave = () => tip.style.display = "none";
+}
+window.addEventListener("resize", () => { if (chartData) drawChart(); });
+
+/* ---------- stale-results handling ---------- */
+function markStale() {
+  if ($("results").style.display === "none") return;
+  $("results").classList.add("stale");
+  $("staleNote").style.display = "block";
+}
+document.querySelector(".wrap").addEventListener("input", e => {
+  if (e.target.closest("#results")) return;
+  markStale();
+});
+
+/* ---------- run ---------- */
+function run() {
+  const errBox = $("errors");
+  const errs = validateInputs();
+  const p = errs.length ? null : readPlan();
+  if (p) {
+    if (p.retireAge < p.age) errs.push("Retirement age must be at least your current age.");
+    if (p.planAge <= p.retireAge) errs.push("Plan-through age must be after retirement age.");
+    if (p.startBalance <= 0 && p.saving <= 0) errs.push("Enter at least one account balance or some yearly savings.");
+  }
+  if (errs.length) {
+    errBox.style.display = "block";
+    errBox.replaceChildren();
+    const b = document.createElement("b"); b.textContent = "Please fix before running:";
+    const ul = document.createElement("ul");
+    errs.forEach(t => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+    errBox.append(b, ul);
+    errBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  errBox.style.display = "none";
+  $("status").textContent = "computing…";
+  $("runBtn").disabled = true;
+  setTimeout(() => { try { compute(p); } finally { $("runBtn").disabled = false; $("status").textContent = ""; } }, 30);
+}
+function compute(p) {
+  const N = 10000;
+  const R = buildReturns(p, N, SEED);
+  const main = simulate(p, R, { record: true });
+  /* percentile bands per year */
+  const years = R.years, ages = [];
+  const bands = { p10: [], p25: [], p50: [], p75: [], p90: [], pBar: [] };
+  const barQ = 1 - p.bar;
+  for (let y = 0; y <= years; y++) {
+    ages.push(p.age + y);
+    const arr = Float64Array.from(main.recB[y]).sort();
+    bands.p10.push(percentile(arr, 0.10)); bands.p25.push(percentile(arr, 0.25));
+    bands.p50.push(percentile(arr, 0.50)); bands.p75.push(percentile(arr, 0.75));
+    bands.p90.push(percentile(arr, 0.90)); bands.pBar.push(percentile(arr, barQ));
+  }
+  /* y cap: don't let the runaway top percentile squash the story */
+  const capBase = Math.max(bands.p75[years], bands.p50[years] * 1.6, p.startBalance * 1.5, 1e5);
+  const yCap = Math.ceil(capBase / 5e5) * 5e5;
+  chartData = { ages, bands, retireAge: p.retireAge, ssAge: p.ssAge, yCap };
+  drawChart(); attachHover(); fillDataTable(p);
+
+  /* headline verdict */
+  const pct = main.success;
+  const pass = pct >= p.bar;
+  $("results").style.display = "block";
+  $("results").classList.remove("stale");
+  $("staleNote").style.display = "none";
+  const v = $("verdict");
+  v.className = "verdict " + (pass ? "pass" : "fail");
+  v.innerHTML = `<span class="pct">${(pct * 100).toFixed(1)}%</span> of 10,000 simulated futures stay funded through age ${p.planAge}.
+    ${pass ? "That meets" : "That is below"} your ${p.bar * 100}% confidence level — the plan currently
+    <b>${pass ? "PASSES" : "FALLS SHORT"}</b>.`;
+
+  /* secondary stats (smaller path counts for speed) */
+  const R5 = buildReturns(p, 4000, SEED + 1);
+  const reqSave = solveRequiredSavings(p, R5);
+  const reqAssets = solveRequiredAssets(p);
+  const maxSpend = solveMaxSpend(p, R5);
+  const retSorted = Float64Array.from(main.retDay).sort();
+  const maxSpendLabel = maxSpend === null ? "n/a"
+    : (maxSpend.capped ? "≥" : "") + fmt$(maxSpend.value) + "/yr";
+  const stats = [
+    [reqAssets === null ? "n/a" : fmtM(reqAssets), `needed on retirement day at age ${p.retireAge} for ${p.bar * 100}% confidence`],
+    [fmtM(percentile(retSorted, 0.5)), `median portfolio on retirement day (your plan)`],
+    [reqSave === null ? ">$500k" : fmt$(reqSave) + "/yr", `savings needed from now to hit ${p.bar * 100}% (you entered ${fmt$(p.saving)})`],
+    [maxSpendLabel, `maximum spending your plan supports at ${p.bar * 100}%`],
+  ];
+  $("stats").innerHTML = stats.map(([v2, l]) => `<div class="stat"><div class="v">${v2}</div><div class="l">${l}</div></div>`).join("");
+
+  /* sensitivity grid */
+  const spends = [0.8, 0.9, 1.0, 1.1, 1.2];
+  let html = "<tr><th>Retire at ↓ / Spend →</th>" + spends.map(m => `<th class="num">${fmt$(p.spend * m)}</th>`).join("") + "</tr>";
+  for (let dA = -2; dA <= 2; dA++) {
+    const ra = p.retireAge + dA;
+    if (ra <= p.age || ra >= p.planAge) continue;
+    html += `<tr><th>${ra}</th>` + spends.map(m => {
+      const s = simulate(p, R5, { retireAge: ra, spendMult: m }).success;
+      const hit = s >= p.bar;
+      return `<td class="cell ${hit ? "hit" : "miss"}">${hit ? "✓" : "✗"} ${Math.round(s * 100)}%</td>`;
+    }).join("") + "</tr>";
+  }
+  $("sensTable").innerHTML = html;
+
+  /* failure anatomy */
+  const dep = [];
+  for (const a of main.depAge) if (a >= 0) dep.push(a);
+  if (dep.length === 0) {
+    $("failure").textContent = "No simulated path ran out of money before age " + p.planAge + ".";
+  } else {
+    dep.sort((a, b) => a - b);
+    const q = f => dep[Math.floor(f * (dep.length - 1))];
+    $("failure").innerHTML = `${(dep.length / N * 100).toFixed(1)}% of paths run out before age ${p.planAge}.
+      Among those, money runs out at median age <b>${q(0.5)}</b> (middle 80%: ages ${q(0.1)}–${q(0.9)}).`;
+  }
+
+  /* assumptions echo (textContent: safe for the user-named income streams) */
+  $("echo").textContent =
+`All figures in today's (real) dollars; inflation handled implicitly.
+Start: age ${p.age}, ${fmt$(p.startBalance)} invested. Save ${fmt$(p.saving)}/yr to ${p.retireAge}, then spend ${fmt$(p.spend)}/yr through ${p.planAge}.
+Social Security: ${fmt$(p.ssAnnual)}/yr starting at ${p.ssAge}, reduced ${p.ssHaircut * 100}% for trust-fund risk → ${fmt$(p.ssAnnual * (1 - p.ssHaircut))}/yr.
+Other income: ${p.incomes.length ? p.incomes.map(s => `${s.name} ${fmt$(s.amount)}/yr ages ${s.start}–${s.end > 150 ? "life" : s.end}`).join("; ") : "none"}.
+Returns (real): stocks ${(p.eqRet * 100).toFixed(1)}% ± ${(p.eqVol * 100).toFixed(0)}%, bonds ${(p.bdRet * 100).toFixed(1)}% ± ${(p.bdVol * 100).toFixed(0)}%, independent normal years.
+Portfolio: ${p.eqNow * 100}% stocks today gliding to ${p.eqRetire * 100}% at retirement, flat after.
+Withdrawals grossed up by a ${(p.taxRate * 100).toFixed(1)}% effective tax rate.
+Success bar: ${p.bar * 100}% of 10,000 Monte Carlo paths (seed ${SEED}) funded through age ${p.planAge}.`;
+
+  saveLocal();
+  $("results").scrollIntoView({ behavior: "smooth" });
+}
+function fillDataTable(p) {
+  const t = $("dataTable");
+  t.replaceChildren();
+  const { ages, bands } = chartData;
+  const head = document.createElement("tr");
+  ["Age", "10th pct", "25th pct", "Median", "75th pct", "90th pct", `Bar path (${(1 - p.bar) * 100}th)`]
+    .forEach(h => { const th = document.createElement("th"); th.textContent = h; head.appendChild(th); });
+  t.appendChild(head);
+  for (let i = 0; i < ages.length; i++) {
+    if (ages[i] % 5 !== 0 && i !== ages.length - 1 && ages[i] !== p.retireAge) continue;
+    const tr = document.createElement("tr");
+    [ages[i], bands.p10[i], bands.p25[i], bands.p50[i], bands.p75[i], bands.p90[i], bands.pBar[i]]
+      .forEach((v, j) => {
+        const td = document.createElement("td");
+        td.textContent = j === 0 ? v : fmt$(v);
+        tr.appendChild(td);
+      });
+    t.appendChild(tr);
+  }
+}
+$("runBtn").onclick = run;
+
+/* ---------- plan (de)serialization with validation ---------- */
+function planToJSON() { return JSON.stringify(readPlan(), null, 2); }
+/* Coerce an untrusted plan object to safe, clamped values. */
+function sanitizePlan(raw) {
+  if (typeof raw !== "object" || raw === null) throw new Error("not a plan object");
+  const p = {};
+  const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? clamp(n, lo, hi) : undefined; };
+  for (const [id, [, lo, hi]] of Object.entries(FIELDS)) {
+    if (id === "ssMonthly") continue;
+    const scale = ["eqRet", "bdRet", "eqVol", "bdVol", "eqNow", "eqRetire", "taxRate", "ssHaircut"].includes(id) ? 100 : 1;
+    p[id] = num(raw[id] * (scale === 100 ? 100 : 1), lo, hi);
+    if (p[id] !== undefined && scale === 100) p[id] /= 100;
+  }
+  p.ssAnnual = num(raw.ssAnnual, 0, 25000 * 12);
+  p.bar = num(raw.bar, 0.5, 0.99);
+  p.accounts = Array.isArray(raw.accounts) ? raw.accounts.slice(0, MAX_ROWS).map(a => ({
+    name: String(a?.name ?? "").slice(0, 40),
+    balance: num(a?.balance, 0, 5e8) ?? 0,
+  })) : [];
+  p.incomes = Array.isArray(raw.incomes) ? raw.incomes.slice(0, MAX_ROWS).map(s => ({
+    name: String(s?.name ?? "income").slice(0, 40),
+    amount: num(s?.amount, 0, 2e6) ?? 0,
+    start: num(s?.start, 50, 105) ?? 65,
+    end: num(s?.end, 50, 200) ?? 200,
+  })) : [];
+  return p;
+}
+function applyPlan(p) {
+  const set = (id, v) => { if (v !== undefined) $(id).value = v; };
+  set("age", p.age); set("retireAge", p.retireAge); set("planAge", p.planAge);
+  set("saving", p.saving); set("spend", p.spend);
+  set("ssAge", p.ssAge); set("ssMonthly", p.ssAnnual !== undefined ? Math.round(p.ssAnnual / 12) : undefined);
+  for (const id of ["eqRet", "bdRet", "eqVol", "bdVol", "eqNow", "eqRetire", "taxRate", "ssHaircut"])
+    set(id, p[id] !== undefined ? +(p[id] * 100).toFixed(2) : undefined);
+  if (p.bar !== undefined && [...$("bar").options].some(o => +o.value === p.bar * 100))
+    $("bar").value = p.bar * 100;
+  $("acctTable").tBodies[0].replaceChildren();
+  (p.accounts?.length ? p.accounts : [{ name: "Total investments", balance: "" }])
+    .forEach(a => addAcctRow(a.name, a.balance));
+  $("incTable").tBodies[0].replaceChildren();
+  (p.incomes || []).forEach(s => addIncRow(s.name, s.amount, s.start, s.end > 150 ? "" : s.end));
+  sumAccts();
+  markStale();
+}
+function saveLocal() { try { localStorage.setItem("retplan", planToJSON()); } catch (e) {} }
+
+/* ---------- toolbar ---------- */
+$("saveBtn").onclick = () => {
+  const blob = new Blob([planToJSON()], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "retirement-plan.json"; a.click();
+};
+$("loadBtn").onclick = () => $("loadFile").click();
+$("loadFile").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (f.size > 1e6) { alert("That file is too large to be a saved plan."); return; }
+  f.text().then(t => {
+    try { applyPlan(sanitizePlan(JSON.parse(t))); }
+    catch (err) { alert("Could not read that file as a saved plan."); }
+  });
+  e.target.value = "";
+};
+$("printBtn").onclick = () => window.print();
+$("pngBtn").onclick = () => {
+  const a = document.createElement("a");
+  a.href = $("fanchart").toDataURL("image/png"); a.download = "retirement-simulation.png"; a.click();
+};
+$("resetBtn").onclick = () => {
+  if (!confirm("Erase everything you've entered on this device and start over?")) return;
+  try { localStorage.removeItem("retplan"); } catch (e) {}
+  location.reload();
+};
+$("themeBtn").onclick = () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute("data-theme") === "dark";
+  root.setAttribute("data-theme", dark ? "light" : "dark");
+  $("themeBtn").textContent = dark ? "Dark mode" : "Light mode";
+  drawChart();
+};
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+  document.documentElement.setAttribute("data-theme", "dark");
+  $("themeBtn").textContent = "Light mode";
+}
+/* printing: open collapsed sections so they appear on paper, then restore */
+let printOpened = [];
+window.addEventListener("beforeprint", () => {
+  printOpened = [...document.querySelectorAll("details:not([open])")];
+  printOpened.forEach(d => d.open = true);
+});
+window.addEventListener("afterprint", () => {
+  printOpened.forEach(d => d.open = false);
+  printOpened = [];
+});
+
+/* ---------- init ---------- */
+(function init() {
+  let saved = null;
+  try { saved = sanitizePlan(JSON.parse(localStorage.getItem("retplan"))); } catch (e) {}
+  if (saved) applyPlan(saved);
+  else { addAcctRow("Total investments", 500000); sumAccts(); }
+  $("staleNote").style.display = "none";
+  $("results").classList.remove("stale");
+})();
+</script>
+</body>
+</html>
