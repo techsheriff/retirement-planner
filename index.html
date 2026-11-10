@@ -831,7 +831,7 @@ function applyPlan(p) {
   if (p.bar !== undefined && [...$("bar").options].some(o => +o.value === p.bar * 100))
     $("bar").value = p.bar * 100;
   $("acctTable").tBodies[0].replaceChildren();
-  (p.accounts?.length ? p.accounts : [{ name: "Total investments", balance: "" }])
+  (p.accounts?.length ? p.accounts : [{ name: "401k", balance: "" }, { name: "IRA", balance: "" }])
     .forEach(a => addAcctRow(a.name, a.balance));
   $("incTable").tBodies[0].replaceChildren();
   (p.incomes || []).forEach(s => addIncRow(s.name, s.amount, s.start, s.end > 150 ? "" : s.end));
@@ -893,7 +893,7 @@ window.addEventListener("afterprint", () => {
   let saved = null;
   try { saved = sanitizePlan(JSON.parse(localStorage.getItem("retplan"))); } catch (e) {}
   if (saved) applyPlan(saved);
-  else { addAcctRow("Total investments", 500000); sumAccts(); }
+  else { addAcctRow("401k", ""); addAcctRow("IRA", ""); sumAccts(); }
   $("staleNote").style.display = "none";
   $("results").classList.remove("stale");
 })();
