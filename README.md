@@ -6,7 +6,7 @@ in your browser and tells you whether your plan clears a confidence bar you
 choose (85% by default), what you'd need to save or hold to clear it, and how
 sensitive the answer is to retiring earlier or spending more.
 
-**Live version:** https://YOUR-USERNAME.github.io/retirement-planner/
+**Live version:** https://techsheriff.github.io/retirement-planner/
 
 ## What it shows
 
