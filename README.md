@@ -37,8 +37,7 @@ changed under Market & tax assumptions.
 
 ## Caveats, including the AI one
 
-This tool was built with substantial help from an AI assistant (Anthropic's
-Claude), with human review and testing. The simulation engine was validated
+This tool was built with substantial help from an AI assistant, with human review and testing. The simulation engine was validated
 against an independently written reference implementation, and the page has
 been through a security and accessibility review. Even so: AI-assisted code
 can contain mistakes that review missed. Read the numbers skeptically.
