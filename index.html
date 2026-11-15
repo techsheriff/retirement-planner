@@ -412,7 +412,7 @@ function addIncRow(name = "", amt = "", start = "", end = "") {
 function addSaveRow(name = "", amt = "") {
   if ($("saveTable").tBodies[0].rows.length >= MAX_ROWS) return;
   const tr = document.createElement("tr");
-  tr.appendChild(textCell(name, "e.g. Roth IRA"));
+  tr.appendChild(textCell(name, "e.g. Roth "));
   tr.appendChild(numCell(amt, 0, 2e6, 1000));
   tr.appendChild(delCell(tr, sumSaves));
   tr.querySelectorAll("input").forEach(i => i.addEventListener("input", sumSaves));
@@ -424,7 +424,7 @@ function sumSaves() {
   $("saveTotal").textContent = fmt$(t);
   return t;
 }
-const DEFAULT_SAVE_ROWS = ["401k + employer match", "Roth IRA", "Brokerage"];
+const DEFAULT_SAVE_ROWS = ["401k + employer match", "Roth ", "Brokerage"];
 $("addAcct").onclick = () => { addAcctRow(); markStale(); };
 $("addSave").onclick = () => { addSaveRow(); markStale(); };
 $("addInc").onclick = () => { addIncRow(); markStale(); };
@@ -865,7 +865,7 @@ function applyPlan(p) {
   if (p.bar !== undefined && [...$("bar").options].some(o => +o.value === p.bar * 100))
     $("bar").value = p.bar * 100;
   $("acctTable").tBodies[0].replaceChildren();
-  (p.accounts?.length ? p.accounts : [{ name: "401k", balance: "" }, { name: "IRA", balance: "" }])
+  (p.accounts?.length ? p.accounts : [{ name: "401k", balance: "" }, { name: "IRA (rolled-over previous 401ks)", balance: "" }])
     .forEach(a => addAcctRow(a.name, a.balance));
   $("saveTable").tBodies[0].replaceChildren();
   if (p.contributions?.length) p.contributions.forEach(c => addSaveRow(c.name, c.amount));
