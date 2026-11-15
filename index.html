@@ -61,6 +61,7 @@
   }
   h2 { font-size: 17px; margin: 0 0 12px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 18px; }
+  .grid.tight { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
   input, select {
     width: 100%; padding: 8px 10px; font-size: 16px; /* >=16px stops iOS zoom-on-focus */
@@ -175,32 +176,38 @@
 
   <div class="card">
     <h2>About you</h2>
-    <div class="grid">
+    <div class="grid tight">
       <div><label for="age">Current age</label><input type="number" id="age" min="18" max="80" value="55"></div>
       <div><label for="retireAge">Retirement age</label><input type="number" id="retireAge" min="50" max="80" value="65"></div>
-      <div><label for="planAge">Plan through age</label><input type="number" id="planAge" min="75" max="105" value="95">
-        <div class="help">How long the money must last. 95 is a prudent default — about 1 in 5 65-year-olds lives past 90.</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Savings &amp; spending</h2>
-    <div class="grid">
-      <div><label for="saving">Savings per year until retirement ($)</label><input type="number" id="saving" min="0" step="1000" value="25000">
-        <div class="help">Everything going into investments: 401k + employer match + IRA + brokerage.</div></div>
+      <div><label for="planAge">Money must last until age</label><input type="number" id="planAge" min="75" max="105" value="95">
+        <div class="help">Pick an age you're unlikely to outlive, not your life expectancy. 95 is a prudent default; about 1 in 5 65-year-olds lives past 90.</div></div>
       <div><label for="spend">Spending per year in retirement ($)</label><input type="number" id="spend" min="0" step="1000" value="80000">
         <div class="help">Today's dollars, all-in (the tool grosses up for taxes separately).</div></div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Investment accounts</h2>
+    <h2>What you have saved so far</h2>
+    <div class="help" style="margin:-6px 0 10px">Current balances of your investment accounts. This is money you already
+      have today, not what you add each year (that goes in the next section).</div>
     <div class="scrollx"><table id="acctTable">
-      <thead><tr><th>Account</th><th class="num">Balance ($)</th><th></th></tr></thead>
+      <thead><tr><th>Account</th><th class="num">Balance today ($)</th><th></th></tr></thead>
       <tbody></tbody>
       <tfoot><tr><th>Total</th><th class="num" id="acctTotal">$0</th><th></th></tr></tfoot>
     </table></div>
     <div style="margin-top:8px"><button id="addAcct" class="small">Add account</button></div>
+  </div>
+
+  <div class="card">
+    <h2>What you save each year (until retirement)</h2>
+    <div class="help" style="margin:-6px 0 10px">New money you add to your investments every year, by account type.
+      Include any employer match.</div>
+    <div class="scrollx"><table id="saveTable">
+      <thead><tr><th>Account type</th><th class="num">Amount per year ($)</th><th></th></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><th>Total</th><th class="num" id="saveTotal">$0</th><th></th></tr></tfoot>
+    </table></div>
+    <div style="margin-top:8px"><button id="addSave" class="small">Add row</button></div>
   </div>
 
   <div class="card">
@@ -214,7 +221,7 @@
       (Retirement Benefit Estimates table — pick the row for your claiming age).
       If you'll stop working before you claim, the statement overstates your benefit;
       <a href="https://ssa.tools/" target="_blank" rel="noopener">ssa.tools</a> can recompute it with your earnings ending at retirement.
-      A safety haircut (default 20%, in Economic Assumptions) is applied for trust-fund uncertainty.
+      A safety cut (default 20%, under Market &amp; tax assumptions) is applied for trust-fund uncertainty.
     </div>
   </div>
 
@@ -228,7 +235,7 @@
   </div>
 
   <details id="assumptions">
-    <summary>Economic Assumptions — sensible defaults, change only if you know why</summary>
+    <summary>Market &amp; tax assumptions — sensible defaults, change only if you know why</summary>
     <div class="card">
       <div class="grid">
         <div><label for="eqRet">Stock return, %/yr above inflation</label><input type="number" id="eqRet" step="0.1" value="5.0">
@@ -241,7 +248,8 @@
           <div class="help">Shifts gradually from today's mix to this by retirement day.</div></div>
         <div><label for="taxRate">Effective tax rate on withdrawals %</label><input type="number" id="taxRate" min="0" max="50" step="0.5" value="12">
           <div class="help">Blended rate across pre-tax, Roth and taxable money.</div></div>
-        <div><label for="ssHaircut">Social Security haircut %</label><input type="number" id="ssHaircut" min="0" max="50" step="1" value="20"></div>
+        <div><label for="ssHaircut">Social Security benefit cut %</label><input type="number" id="ssHaircut" min="0" max="50" step="1" value="20">
+          <div class="help">Assumes benefits get cut this much, for trust-fund risk.</div></div>
         <div><label for="bar">Confidence level required</label>
           <select id="bar"><option>75</option><option>80</option><option selected>85</option><option>90</option></select>
           <div class="help">Plan passes if at least this share of simulations never runs out.</div></div>
@@ -319,8 +327,7 @@ const MAX_ROWS = 20;
 const FIELDS = {
   age: ["Current age", 18, 80],
   retireAge: ["Retirement age", 50, 80],
-  planAge: ["Plan through age", 75, 105],
-  saving: ["Savings per year", 0, 2e6],
+  planAge: ["Money-must-last age", 75, 105],
   spend: ["Spending per year", 0, 2e6],
   ssAge: ["Social Security start age", 62, 70],
   ssMonthly: ["Social Security monthly benefit", 0, 25000],
@@ -331,7 +338,7 @@ const FIELDS = {
   eqNow: ["Stocks % today", 0, 100],
   eqRetire: ["Stocks % at retirement", 0, 100],
   taxRate: ["Tax rate", 0, 50],
-  ssHaircut: ["Social Security haircut", 0, 50],
+  ssHaircut: ["Social Security benefit cut", 0, 50],
 };
 
 /* Seeded RNG (mulberry32) + Box-Muller standard normals. */
@@ -402,7 +409,24 @@ function addIncRow(name = "", amt = "", start = "", end = "") {
   tr.appendChild(delCell(tr));
   $("incTable").tBodies[0].appendChild(tr);
 }
+function addSaveRow(name = "", amt = "") {
+  if ($("saveTable").tBodies[0].rows.length >= MAX_ROWS) return;
+  const tr = document.createElement("tr");
+  tr.appendChild(textCell(name, "e.g. Roth IRA"));
+  tr.appendChild(numCell(amt, 0, 2e6, 1000));
+  tr.appendChild(delCell(tr, sumSaves));
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("input", sumSaves));
+  $("saveTable").tBodies[0].appendChild(tr);
+}
+function sumSaves() {
+  let t = 0;
+  for (const tr of $("saveTable").tBodies[0].rows) t += clamp(+tr.cells[1].firstChild.value || 0, 0, 2e6);
+  $("saveTotal").textContent = fmt$(t);
+  return t;
+}
+const DEFAULT_SAVE_ROWS = ["401k + employer match", "Roth IRA", "Brokerage"];
 $("addAcct").onclick = () => { addAcctRow(); markStale(); };
+$("addSave").onclick = () => { addSaveRow(); markStale(); };
 $("addInc").onclick = () => { addIncRow(); markStale(); };
 
 /* ---------- read & validate inputs ---------- */
@@ -435,9 +459,14 @@ function readPlan() {
     name: String(tr.cells[0].firstChild.value).slice(0, 40),
     balance: clamp(+tr.cells[1].firstChild.value || 0, 0, 5e8),
   });
+  const contributions = [];
+  for (const tr of $("saveTable").tBodies[0].rows) contributions.push({
+    name: String(tr.cells[0].firstChild.value).slice(0, 40),
+    amount: clamp(+tr.cells[1].firstChild.value || 0, 0, 2e6),
+  });
   return {
     age: f("age"), retireAge: f("retireAge"), planAge: f("planAge"),
-    saving: f("saving"), spend: f("spend"),
+    saving: sumSaves(), contributions, spend: f("spend"),
     accounts, startBalance: sumAccts(),
     ssAge: f("ssAge"), ssAnnual: 12 * f("ssMonthly"),
     incomes,
@@ -665,7 +694,7 @@ function run() {
   const p = errs.length ? null : readPlan();
   if (p) {
     if (p.retireAge < p.age) errs.push("Retirement age must be at least your current age.");
-    if (p.planAge <= p.retireAge) errs.push("Plan-through age must be after retirement age.");
+    if (p.planAge <= p.retireAge) errs.push("The money-must-last age must be after retirement age.");
     if (p.startBalance <= 0 && p.saving <= 0) errs.push("Enter at least one account balance or some yearly savings.");
   }
   if (errs.length) {
@@ -727,7 +756,7 @@ function compute(p) {
   const stats = [
     [reqAssets === null ? "n/a" : fmtM(reqAssets), `needed on retirement day at age ${p.retireAge} for ${p.bar * 100}% confidence`],
     [fmtM(percentile(retSorted, 0.5)), `median portfolio on retirement day (your plan)`],
-    [reqSave === null ? ">$500k" : fmt$(reqSave) + "/yr", `savings needed from now to hit ${p.bar * 100}% (you entered ${fmt$(p.saving)})`],
+    [reqSave === null ? ">$500k" : fmt$(reqSave) + "/yr", `savings needed from now to hit ${p.bar * 100}% (your total: ${fmt$(p.saving)}/yr)`],
     [maxSpendLabel, `maximum spending your plan supports at ${p.bar * 100}%`],
   ];
   $("stats").innerHTML = stats.map(([v2, l]) => `<div class="stat"><div class="v">${v2}</div><div class="l">${l}</div></div>`).join("");
@@ -809,6 +838,11 @@ function sanitizePlan(raw) {
   }
   p.ssAnnual = num(raw.ssAnnual, 0, 25000 * 12);
   p.bar = num(raw.bar, 0.5, 0.99);
+  p.saving = num(raw.saving, 0, 2e6);
+  p.contributions = Array.isArray(raw.contributions) ? raw.contributions.slice(0, MAX_ROWS).map(c => ({
+    name: String(c?.name ?? "").slice(0, 40),
+    amount: num(c?.amount, 0, 2e6) ?? 0,
+  })) : [];
   p.accounts = Array.isArray(raw.accounts) ? raw.accounts.slice(0, MAX_ROWS).map(a => ({
     name: String(a?.name ?? "").slice(0, 40),
     balance: num(a?.balance, 0, 5e8) ?? 0,
@@ -824,7 +858,7 @@ function sanitizePlan(raw) {
 function applyPlan(p) {
   const set = (id, v) => { if (v !== undefined) $(id).value = v; };
   set("age", p.age); set("retireAge", p.retireAge); set("planAge", p.planAge);
-  set("saving", p.saving); set("spend", p.spend);
+  set("spend", p.spend);
   set("ssAge", p.ssAge); set("ssMonthly", p.ssAnnual !== undefined ? Math.round(p.ssAnnual / 12) : undefined);
   for (const id of ["eqRet", "bdRet", "eqVol", "bdVol", "eqNow", "eqRetire", "taxRate", "ssHaircut"])
     set(id, p[id] !== undefined ? +(p[id] * 100).toFixed(2) : undefined);
@@ -833,9 +867,13 @@ function applyPlan(p) {
   $("acctTable").tBodies[0].replaceChildren();
   (p.accounts?.length ? p.accounts : [{ name: "401k", balance: "" }, { name: "IRA", balance: "" }])
     .forEach(a => addAcctRow(a.name, a.balance));
+  $("saveTable").tBodies[0].replaceChildren();
+  if (p.contributions?.length) p.contributions.forEach(c => addSaveRow(c.name, c.amount));
+  else if (p.saving > 0) addSaveRow("Total yearly savings", p.saving); /* plans saved before the breakdown existed */
+  else DEFAULT_SAVE_ROWS.forEach(n => addSaveRow(n, ""));
   $("incTable").tBodies[0].replaceChildren();
   (p.incomes || []).forEach(s => addIncRow(s.name, s.amount, s.start, s.end > 150 ? "" : s.end));
-  sumAccts();
+  sumAccts(); sumSaves();
   markStale();
 }
 function saveLocal() { try { localStorage.setItem("retplan", planToJSON()); } catch (e) {} }
@@ -893,7 +931,11 @@ window.addEventListener("afterprint", () => {
   let saved = null;
   try { saved = sanitizePlan(JSON.parse(localStorage.getItem("retplan"))); } catch (e) {}
   if (saved) applyPlan(saved);
-  else { addAcctRow("401k", ""); addAcctRow("IRA", ""); sumAccts(); }
+  else {
+    addAcctRow("401k", ""); addAcctRow("IRA", "");
+    DEFAULT_SAVE_ROWS.forEach(n => addSaveRow(n, ""));
+    sumAccts(); sumSaves();
+  }
   $("staleNote").style.display = "none";
   $("results").classList.remove("stale");
 })();

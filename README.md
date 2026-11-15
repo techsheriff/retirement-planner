@@ -6,7 +6,7 @@ in your browser and tells you whether your plan clears a confidence bar you
 choose (85% by default), what you'd need to save or hold to clear it, and how
 sensitive the answer is to retiring earlier or spending more.
 
-**Live version:** https://techsheriff.github.io/retirement-planner/
+**Live version:** https://techsheriff.net/retirement-planner/
 
 ## What it shows
 
@@ -31,9 +31,9 @@ All amounts are in today's dollars; returns are real (after-inflation)
 returns, so inflation never needs to be entered. Defaults are deliberately
 conservative: 5% real stock returns (below the ~7% historical average), 1.5%
 real bond returns, a portfolio that glides from 80% stocks to 60% by
-retirement, a 12% blended tax rate on withdrawals, and a 20% haircut on Social
-Security benefits for trust-fund uncertainty. All of these can be changed
-under Economic Assumptions.
+retirement, a 12% blended tax rate on withdrawals, and a 20% safety cut on
+Social Security benefits for trust-fund uncertainty. All of these can be
+changed under Market & tax assumptions.
 
 ## Caveats, including the AI one
 
