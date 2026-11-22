@@ -150,7 +150,7 @@
     .stat .v { font-size: 19px; }
   }
   @media print {
-    button, .toolbar, .run-row, #staleNote { display: none !important; }
+    button, .toolbar, .run-row, #staleNote, #examples { display: none !important; }
     body { background: #fff; }
   }
 </style>
@@ -174,7 +174,7 @@
   </header>
   <p class="privacy">Everything runs in your browser — nothing you type is sent anywhere.
     Entries are saved only on this device; use “Reset all data” to erase them.</p>
-  <p class="privacy">Start from:
+  <p class="privacy" id="examples">Start from:
     <button id="exWork" class="small">working example</button>
     <button id="exRet" class="small">retired example</button>
     <button id="exBlank" class="small">blank</button>
@@ -272,8 +272,7 @@
     <button id="runBtn" class="primary">Run 10,000 simulations</button><span id="status"></span>
   </div>
 
-  <div id="staleNote">Inputs have changed: results refresh automatically in a moment.
-    If they do not, press Run to see what needs fixing.</div>
+  <div id="staleNote">Inputs have changed since this result was computed — run the simulation again.</div>
 
   <div id="results" style="display:none">
     <div id="verdict" class="verdict"></div>
@@ -324,9 +323,8 @@
         type (include any employer match), and what you expect to spend per year once retired, all in
         today's dollars. Get your Social Security figure from
         <a href="https://www.ssa.gov/myaccount/" target="_blank" rel="noopener">ssa.gov/myaccount</a>.
-        Results refresh on their own as you type. If the verdict falls short, the buttons under the
-        results apply the computed fix: raise savings to the required level, or cap spending at what
-        the plan supports.</p>
+        Press Run. If the verdict falls short, the buttons under the results apply the computed fix
+        and rerun: raise savings to the required level, or cap spending at what the plan supports.</p>
       <h2>If you are already retired</h2>
       <p>Set retirement age equal to your current age and leave the yearly savings rows blank. If you
         are already collecting Social Security, enter the age you actually claimed and your current
@@ -343,7 +341,7 @@
         deliberately. "Save plan (.json)" downloads the same thing as a file. "Print / PDF" produces a
         report with every assumption listed, made to hand to an advisor.</p>
       <h2>Once a year</h2>
-      <p>Update your age and balances, let it rerun, and check the verdict still clears your bar. If it
+      <p>Update your age and balances, run it again, and check the verdict still clears your bar. If it
         slipped, the required-savings number tells you the correction while it is still small.</p>
     </div>
   </details>
@@ -740,14 +738,8 @@ function attachHover() {
 }
 window.addEventListener("resize", () => { if (chartData) drawChart(); });
 
-/* ---------- stale-results handling + debounced auto-recompute ---------- */
-let runTimer = null;
-function scheduleRun() {
-  clearTimeout(runTimer);
-  runTimer = setTimeout(() => run(true), 700);
-}
+/* ---------- stale-results handling ---------- */
 function markStale() {
-  scheduleRun();
   if ($("results").style.display === "none") return;
   $("results").classList.add("stale");
   $("staleNote").style.display = "block";
@@ -758,10 +750,9 @@ document.querySelector(".wrap").addEventListener("input", e => {
 });
 
 /* ---------- run ---------- */
-/* quiet=true is the auto-recompute path: invalid inputs just wait instead of
-   flashing the error box at someone mid-keystroke */
+/* quiet=true runs programmatically (shared link, example, apply buttons):
+   invalid inputs return silently instead of flashing the error box */
 function run(quiet = false) {
-  clearTimeout(runTimer);
   const errBox = $("errors");
   const errs = validateInputs();
   const p = errs.length ? null : readPlan();
@@ -840,8 +831,8 @@ function compute(p) {
         ? `<button id="applySpendBtn" class="small" style="margin-top:6px">Set my spending to ${fmt$(spendTarget)}/yr</button>` : ""],
   ];
   $("stats").innerHTML = stats.map(([v2, l, act]) => `<div class="stat"><div class="v">${v2}</div><div class="l">${l}</div>${act}</div>`).join("");
-  if ($("applySaveBtn")) $("applySaveBtn").onclick = () => setSavingsTotal(saveTarget);
-  if ($("applySpendBtn")) $("applySpendBtn").onclick = () => { $("spend").value = spendTarget; markStale(); };
+  if ($("applySaveBtn")) $("applySaveBtn").onclick = () => { setSavingsTotal(saveTarget); run(true); };
+  if ($("applySpendBtn")) $("applySpendBtn").onclick = () => { $("spend").value = spendTarget; markStale(); run(true); };
 
   /* sensitivity grid */
   const spends = [0.8, 0.9, 1.0, 1.1, 1.2];
@@ -1023,8 +1014,8 @@ function applyBlank() {
   $("incTable").tBodies[0].replaceChildren();
   sumAccts(); sumSaves(); markStale();
 }
-$("exWork").onclick = () => applyPlan(sanitizePlan(EXAMPLE_WORKING));
-$("exRet").onclick = () => applyPlan(sanitizePlan(EXAMPLE_RETIRED));
+$("exWork").onclick = () => { applyPlan(sanitizePlan(EXAMPLE_WORKING)); run(true); };
+$("exRet").onclick = () => { applyPlan(sanitizePlan(EXAMPLE_RETIRED)); run(true); };
 $("exBlank").onclick = applyBlank;
 $("pngBtn").onclick = () => {
   const a = document.createElement("a");
@@ -1059,9 +1050,9 @@ window.addEventListener("afterprint", () => {
 
 /* ---------- init ---------- */
 (function init() {
-  let plan = null;
+  let plan = null, fromLink = false;
   if (location.hash.startsWith("#plan=")) {
-    try { plan = sanitizePlan(JSON.parse(decodeURIComponent(location.hash.slice(6)))); } catch (e) {}
+    try { plan = sanitizePlan(JSON.parse(decodeURIComponent(location.hash.slice(6)))); fromLink = true; } catch (e) {}
     /* a shared link loads once, then this device's own storage takes over */
     history.replaceState(null, "", location.pathname + location.search);
   }
@@ -1070,6 +1061,7 @@ window.addEventListener("afterprint", () => {
   else applyBlank();
   $("staleNote").style.display = "none";
   $("results").classList.remove("stale");
+  if (fromLink) run(true); /* a shared link should land on its results */
 })();
 </script>
 </body>
