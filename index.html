@@ -982,8 +982,41 @@ $("loadFile").onchange = e => {
   e.target.value = "";
 };
 $("printBtn").onclick = () => window.print();
-$("linkBtn").onclick = () => {
-  const url = location.origin + location.pathname + "#plan=" + encodeURIComponent(JSON.stringify(readPlan()));
+/* ---------- share-link encoding (all client-side; nothing leaves the browser) ---------- */
+function stripDerived(p) {
+  /* recomputed on load, so share links omit them to stay short */
+  const { eqRet, bdRet, saving, startBalance, ...rest } = p;
+  return rest;
+}
+const b64url = {
+  enc: bytes => { let s = ""; for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, ""); },
+  dec: s => Uint8Array.from(atob(s.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0)),
+};
+async function pipeBytes(bytes, stream) {
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+  return new Uint8Array(await out.arrayBuffer());
+}
+async function planToHash() {
+  const json = JSON.stringify(stripDerived(readPlan()));
+  if (typeof CompressionStream !== "undefined") {
+    const packed = await pipeBytes(new TextEncoder().encode(json), new CompressionStream("deflate-raw"));
+    return "#z=" + b64url.enc(packed);
+  }
+  return "#plan=" + encodeURIComponent(json); /* older browsers: longer but equivalent */
+}
+async function hashToPlan(hash) {
+  if (hash.length > 20000) return null; /* nothing legitimate is this long */
+  if (hash.startsWith("#z=") && typeof DecompressionStream !== "undefined") {
+    const bytes = await pipeBytes(b64url.dec(hash.slice(3)), new DecompressionStream("deflate-raw"));
+    if (bytes.length > 1e6) throw new Error("decompressed link too large");
+    return sanitizePlan(JSON.parse(new TextDecoder().decode(bytes)));
+  }
+  if (hash.startsWith("#plan=")) return sanitizePlan(JSON.parse(decodeURIComponent(hash.slice(6))));
+  return null;
+}
+$("linkBtn").onclick = async () => {
+  const url = location.origin + location.pathname + await planToHash();
   const done = () => {
     $("status").textContent = "Link copied. It contains your numbers, so share it deliberately.";
     setTimeout(() => { if ($("status").textContent.startsWith("Link copied")) $("status").textContent = ""; }, 6000);
@@ -1049,10 +1082,10 @@ window.addEventListener("afterprint", () => {
 });
 
 /* ---------- init ---------- */
-(function init() {
+(async function init() {
   let plan = null, fromLink = false;
-  if (location.hash.startsWith("#plan=")) {
-    try { plan = sanitizePlan(JSON.parse(decodeURIComponent(location.hash.slice(6)))); fromLink = true; } catch (e) {}
+  if (location.hash.startsWith("#z=") || location.hash.startsWith("#plan=")) {
+    try { plan = await hashToPlan(location.hash); fromLink = plan !== null; } catch (e) {}
     /* a shared link loads once, then this device's own storage takes over */
     history.replaceState(null, "", location.pathname + location.search);
   }
