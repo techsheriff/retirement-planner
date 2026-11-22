@@ -24,16 +24,24 @@ sensitive the answer is to retiring earlier or spending more.
 Everything runs in your browser. The page makes no network requests, so
 nothing you type is transmitted anywhere. Entries are kept in your browser's
 local storage on your own device; the "Reset all data" button erases them.
+The "Copy link" button encodes your entries into the link itself; nothing is
+uploaded, but anyone you give that link can see those numbers.
 
 ## Model and defaults
 
-All amounts are in today's dollars; returns are real (after-inflation)
-returns, so inflation never needs to be entered. Defaults are deliberately
-conservative: 5% real stock returns (below the ~7% historical average), 1.5%
-real bond returns, a portfolio that glides from 80% stocks to 60% by
-retirement, a 12% blended tax rate on withdrawals, and a 20% safety cut on
-Social Security benefits for trust-fund uncertainty. All of these can be
-changed under Market & tax assumptions.
+All amounts are in today's dollars. You enter expected stock and bond returns
+before inflation plus an inflation assumption; the tool converts them to real
+(after-inflation) returns internally, so every result stays in today's
+dollars. Defaults are deliberately conservative against current institutional
+forecasts: 6% stocks before inflation (Vanguard's September 2026 10-year
+outlook runs 4.8-6.8% for US equities; J.P. Morgan's 2027 Long-Term Capital
+Market Assumptions put US large caps at 7.5%), 5.5% bonds before inflation
+(the midpoint of Vanguard's 5.1-6.1% outlook for US aggregate bonds), and 3%
+inflation (above the Cleveland Fed's 2.67%
+10-year expectation as of November 2026). The portfolio glides from 80%
+stocks to 60% by retirement, withdrawals carry a 12% blended tax rate, and
+Social Security gets a 20% safety cut for trust-fund uncertainty. All of
+these can be changed under Market & tax assumptions.
 
 ## Caveats, including the AI one
 
